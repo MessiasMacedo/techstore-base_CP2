@@ -9,6 +9,14 @@ import Carrinho from './pages/Carrinho'
 import Estoque from './pages/Estoque'
 import { buscarProdutos } from './services/produtos'
 import { buscarClientes } from './services/clientes'
+import { produtoDisponivel } from './utils/carrinho'
+
+const FILA_ESPERA_INICIAL = [
+  { id: '1', produtoId: '4', produtoNome: 'Tênis Esportivo', nome: 'Rafaela Nascimento', email: 'rafaela.nascimento@email.com' },
+  { id: '2', produtoId: '4', produtoNome: 'Tênis Esportivo', nome: 'Felipe Moreira', email: 'felipe.moreira@email.com' },
+  { id: '3', produtoId: '9', produtoNome: 'Caixa de Som Inteligente', nome: 'Nina Costa', email: 'nina.costa@email.com' },
+  { id: '4', produtoId: '14', produtoNome: 'Óculos de Sol Clássico', nome: 'Beatriz Silva', email: 'beatriz.silva@email.com' },
+]
 
 export default function App() {
   const [produtos, setProdutos] = useState([])
@@ -17,6 +25,7 @@ export default function App() {
   const [carrinho, setCarrinho] = useState([])
   const [clientes, setClientes] = useState([])
   const [clienteAtualId, setClienteAtualId] = useState(null)
+  const [listaEspera, setListaEspera] = useState(FILA_ESPERA_INICIAL)
 
   useEffect(() => {
     buscarProdutos()
@@ -31,7 +40,9 @@ export default function App() {
   }, [])
 
   function adicionarAoCarrinho(produto) {
-    setCarrinho(carrinho.concat(produto))
+    if (!produtoDisponivel(produto)) return
+
+    setCarrinho((carrinhoAnterior) => carrinhoAnterior.concat(produto))
   }
 
   function removerUmaUnidade(produtoId) {
@@ -46,6 +57,32 @@ export default function App() {
         return true
       })
     )
+  }
+
+  function registrarEspera({ produtoId, produtoNome, nome, email }) {
+    const dadosValidos = produtoId && produtoNome && nome && email
+    if (!dadosValidos) return false
+
+    setListaEspera((listaAnterior) => {
+      const jaExiste = listaAnterior.some(
+        (item) => item.produtoId === produtoId && item.email.toLowerCase() === email.toLowerCase()
+      )
+
+      if (jaExiste) return listaAnterior
+
+      return [
+        ...listaAnterior,
+        {
+          id: crypto.randomUUID(),
+          produtoId,
+          produtoNome,
+          nome,
+          email,
+        },
+      ]
+    })
+
+    return true
   }
 
   const clienteAtual = clientes.find((cliente) => cliente.id === clienteAtualId)
@@ -67,7 +104,13 @@ export default function App() {
             />
             <Route
               path="/produto/:id"
-              element={<PaginaProduto produtos={produtos} onAdicionar={adicionarAoCarrinho} />}
+              element={
+                <PaginaProduto
+                  produtos={produtos}
+                  onAdicionar={adicionarAoCarrinho}
+                  onRegistrarEspera={registrarEspera}
+                />
+              }
             />
             <Route
               path="/carrinho"
@@ -81,7 +124,10 @@ export default function App() {
                 />
               }
             />
-            <Route path="/estoque" element={<Estoque produtos={produtos} />} />
+            <Route
+              path="/estoque"
+              element={<Estoque produtos={produtos} listaEspera={listaEspera} />}
+            />
           </Routes>
         )}
       </main>

@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { produtoDisponivel } from '../utils/carrinho'
 
-export default function PaginaProduto({ produtos, onAdicionar }) {
+export default function PaginaProduto({ produtos, onAdicionar, onRegistrarEspera }) {
   const { id } = useParams()
   const produto = produtos.find((item) => item.id === id)
+  const [formulario, setFormulario] = useState({ nome: '', email: '' })
+  const [mensagem, setMensagem] = useState('')
 
   if (!produto) {
     return (
@@ -15,8 +19,37 @@ export default function PaginaProduto({ produtos, onAdicionar }) {
     )
   }
 
+  const esgotado = Number(produto.estoque ?? 0) === 0
+  const precoValido = Number.isFinite(Number(produto.price)) && Number(produto.price) > 0
+
+  function handleSubmit(evento) {
+    evento.preventDefault()
+
+    const nome = formulario.nome.trim()
+    const email = formulario.email.trim()
+
+    if (!nome || !email) {
+      setMensagem('Preencha nome e e-mail para receber o aviso.')
+      return
+    }
+
+    const enviado = onRegistrarEspera({
+      produtoId: produto.id,
+      produtoNome: produto.title,
+      nome,
+      email,
+    })
+
+    if (enviado) {
+      setMensagem(`Tudo certo, ${nome}! Vamos avisar você em ${email} quando o produto voltar.`)
+      setFormulario({ nome: '', email: '' })
+    } else {
+      setMensagem('Não foi possível registrar o aviso neste momento.')
+    }
+  }
+
   const relacionados = produtos
-    .filter((item) => item.category === produto.category && item.id !== produto.id)
+    .filter((item) => item.category === produto.category && item.id !== produto.id && produtoDisponivel(item))
     .slice(0, 4)
 
   return (
@@ -37,17 +70,56 @@ export default function PaginaProduto({ produtos, onAdicionar }) {
           <p className="card-avaliacao">
             ★ {produto.rating.rate} <span>({produto.rating.count} avaliações)</span>
           </p>
-          <p className="detalhe-preco">R$ {produto.price.toFixed(2).replace('.', ',')}</p>
+          <p className="detalhe-preco">
+            {precoValido ? `R$ ${Number(produto.price).toFixed(2).replace('.', ',')}` : 'Preço indisponível'}
+          </p>
           <p className="detalhe-descricao">{produto.description}</p>
-          <p className="detalhe-estoque">{produto.estoque} unidades disponíveis</p>
+          <p className="detalhe-estoque">
+            {esgotado ? 'Produto esgotado' : `${produto.estoque} unidades disponíveis`}
+          </p>
 
           <button
             className="botao botao-grande"
             onClick={() => onAdicionar(produto)}
-            disabled={produto.estoque === 0}
+            disabled={esgotado || !precoValido}
           >
-            Adicionar ao carrinho
+            {esgotado ? 'Produto esgotado' : !precoValido ? 'Indisponível' : 'Adicionar ao carrinho'}
           </button>
+
+          {esgotado && (
+            <div className="aviso-esgotado">
+              <h2>Produto esgotado</h2>
+              <p>Receba um aviso quando este item voltar ao estoque.</p>
+
+              <form className="formulario-aviso" onSubmit={handleSubmit}>
+                <label>
+                  Nome
+                  <input
+                    type="text"
+                    value={formulario.nome}
+                    onChange={(evento) => setFormulario((anterior) => ({ ...anterior, nome: evento.target.value }))}
+                    placeholder="Seu nome"
+                  />
+                </label>
+
+                <label>
+                  E-mail
+                  <input
+                    type="email"
+                    value={formulario.email}
+                    onChange={(evento) => setFormulario((anterior) => ({ ...anterior, email: evento.target.value }))}
+                    placeholder="seu@email.com"
+                  />
+                </label>
+
+                <button type="submit" className="botao botao-secundario">
+                  Avise-me quando voltar
+                </button>
+              </form>
+
+              {mensagem && <p className="mensagem-aviso">{mensagem}</p>}
+            </div>
+          )}
 
           <ul className="detalhe-garantias">
             <li>Troca grátis em até 30 dias</li>

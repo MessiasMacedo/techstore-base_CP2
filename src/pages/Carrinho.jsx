@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import SugestaoItem from '../components/SugestaoItem'
-import { agruparItens, calcularTotal } from '../utils/carrinho'
+import { agruparItens, calcularTotal, produtoDisponivel } from '../utils/carrinho'
 import { validarCupom } from '../utils/cupons'
 import { formatarPreco } from '../utils/formatarPreco'
 
@@ -13,9 +13,10 @@ export default function Carrinho({ carrinho, produtos, clienteAtual, onAdicionar
   const itens = agruparItens(carrinho)
   const total = calcularTotal(carrinho)
   const totalComDesconto = cupomAplicado ? total * (1 - cupomAplicado.desconto) : total
+  const valorFaltanteGratis = Math.max(0, 200 - totalComDesconto)
 
   const sugestoes = produtos
-    .filter((produto) => !carrinho.find((item) => item.id === produto.id))
+    .filter((produto) => produtoDisponivel(produto) && !carrinho.find((item) => item.id === produto.id))
     .slice(0, 3)
 
   function aplicarCupom(evento) {
@@ -27,7 +28,7 @@ export default function Carrinho({ carrinho, produtos, clienteAtual, onAdicionar
       setMensagemCupom('Cupom aplicado!')
     } else {
       setCupomAplicado(null)
-      setMensagemCupom('Cupom inválido')
+      setMensagemCupom(resultado.motivo || 'Cupom inválido')
     }
   }
 
@@ -91,6 +92,12 @@ export default function Carrinho({ carrinho, produtos, clienteAtual, onAdicionar
             <p className="resumo-linha">
               <span>Desconto</span>
               <span>{cupomAplicado.desconto * 100}%</span>
+            </p>
+          )}
+          {totalComDesconto < 200 && (
+            <p className="resumo-linha">
+              <span>Frete grátis</span>
+              <span>Faltam {formatarPreco(valorFaltanteGratis)}</span>
             </p>
           )}
           <p className="total">
